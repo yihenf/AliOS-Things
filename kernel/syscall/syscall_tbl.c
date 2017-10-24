@@ -7,14 +7,18 @@
 #ifdef WITH_LWIP
 #include <lwip/netdb.h>
 #include <lwip/sockets.h>
+#define WITH_LWIP 1
 #endif
 #include <hal/hal.h>
 #ifdef CONFIG_AOS_MESH
 #include <umesh.h>
+#include <ip/lwip_adapter.h>
+#define CONFIG_AOS_MESH 1
 #endif
 #ifdef MBEDTLS_IN_KERNEL
 #include <aos/mbedtls_ssl.h>
 #include <ali_crypto.h>
+#define MBEDTLS_IN_KERNEL 1
 #endif
 
 
@@ -37,6 +41,8 @@ void *sys_aos_malloc(unsigned int size, size_t allocator)
 
     return tmp;
 }
+EXPORT_SYMBOL_K(RHINO_CONFIG_MM_DEBUG > 0u && RHINO_CONFIG_GCC_RETADDR > 0u, sys_aos_malloc, \
+    "void *sys_aos_malloc(unsigned int size, size_t allocator)")
 
 void *sys_aos_realloc(void *mem, unsigned int size, size_t allocator)
 {
@@ -54,6 +60,8 @@ void *sys_aos_realloc(void *mem, unsigned int size, size_t allocator)
 
     return tmp;
 }
+EXPORT_SYMBOL_K(RHINO_CONFIG_MM_DEBUG > 0u && RHINO_CONFIG_GCC_RETADDR > 0u, sys_aos_realloc, \
+    "void *sys_aos_realloc(void *mem, unsigned int size, size_t allocator)")
 
 void *sys_aos_zalloc(unsigned int size, size_t allocator)
 {
@@ -71,24 +79,22 @@ void *sys_aos_zalloc(unsigned int size, size_t allocator)
 
     return tmp;
 }
+EXPORT_SYMBOL_K(RHINO_CONFIG_MM_DEBUG > 0u && RHINO_CONFIG_GCC_RETADDR > 0u, sys_aos_zalloc, \
+    "void *sys_aos_zalloc(unsigned int size, size_t allocator)")
 
 int get_errno(void)
 {
     return errno;
 }
+EXPORT_SYMBOL_K(1, get_errno, "int get_errno(void)")
 
 void set_errno(int err)
 {
     errno = err;
 }
+EXPORT_SYMBOL_K(1, set_errno, "void set_errno(int err)")
 
-#define SYSCALL_MAX 190
-#define SYSCALL_NUM 160
+/* for syscall_tbl.h, on the last */
 
-#define SYSCALL(nr, func) [nr] = func,
-
-const void *g_syscall_tbl[] __attribute__ ((section(".syscall_tbl"))) = {
-    [0 ... SYSCALL_MAX - 1] = (void *)0XABCDABCD,
 #include <syscall_tbl.h>
-};
 

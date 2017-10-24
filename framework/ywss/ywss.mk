@@ -1,6 +1,12 @@
 NAME := ywss
 
 GLOBAL_INCLUDES += .
+$(NAME)_SOURCES := awss.c enrollee.c sha256.c zconfig_utils.c zconfig_ieee80211.c wifimgr.c ywss_utils.c
+$(NAME)_SOURCES += zconfig_ut_test.c registrar.c zconfig_protocol.c zconfig_vendor_common.c
+ifeq ($(awss_ble),1)
+$(NAME)_SOURCES += awss_blefi.c blefi_config.c
+GLOBAL_DEFINES += CONFIG_AWSS_BLE
+endif
 
 $(NAME)_DEFINES += DEBUG
 
@@ -10,14 +16,3 @@ $(NAME)_CFLAGS  += -Wno-return-type -Wno-unused-function -Wno-unused-but-set-var
 $(NAME)_CFLAGS  += -Wno-unused-value -Wno-strict-aliasing
 
 GLOBAL_DEFINES += CONFIG_YWSS
-
-PLATFORM := linuxhost
-ifeq ($(HOST_ARCH), linux)
-PLATFORM := linuxhost
-$(NAME)_PREBUILT_LIBRARY := lib/$(PLATFORM)/libywss.a
-else ifeq ($(HOST_ARCH), ARM968E-S)
-PLATFORM := mk3060
-$(NAME)_PREBUILT_LIBRARY := lib/$(PLATFORM)/libywss.a
-else
-$(error "not find correct platform!")
-endif

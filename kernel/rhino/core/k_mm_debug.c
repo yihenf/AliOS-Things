@@ -9,10 +9,11 @@
 #include "k_mm.h"
 #endif
 #include "k_mm_debug.h"
-#include "aos/aos.h"
+
 
 #ifdef CONFIG_AOS_CLI
 #define print aos_cli_printf
+int aos_cli_printf(const char *msg, ...);
 #else
 #define print printf
 #endif
@@ -256,7 +257,9 @@ uint32_t dump_mmleak()
     k_mm_region_info_t *reginfo, *nextreg;
     k_mm_list_t *next, *cur;
 
-    krhino_sched_disable();
+#if (RHINO_CONFIG_MM_REGION_MUTEX == 1)
+    krhino_mutex_lock(&g_kmm_head->mm_mutex, RHINO_WAIT_FOREVER);
+#endif
 
     reginfo = g_kmm_head->regioninfo;
     while (reginfo) {
@@ -287,7 +290,10 @@ uint32_t dump_mmleak()
         reginfo = nextreg;
     }
 
-    krhino_sched_enable();
+#if (RHINO_CONFIG_MM_REGION_MUTEX == 1)
+    krhino_mutex_unlock(&g_kmm_head->mm_mutex);
+#endif
+
     return 0;
 }
 #endif
@@ -440,9 +446,9 @@ void dump_kmm_statistic_info(k_mm_head *mmhead)
 
 uint32_t dumpsys_mm_info_func(char *buf, uint32_t len)
 {
-    CPSR_ALLOC();
-
-    RHINO_CRITICAL_ENTER();
+#if (RHINO_CONFIG_MM_REGION_MUTEX == 1)
+    krhino_mutex_lock(&g_kmm_head->mm_mutex, RHINO_WAIT_FOREVER);
+#endif
 
     VGF(VALGRIND_MAKE_MEM_DEFINED(g_kmm_head, sizeof(k_mm_head)));
     print("\r\n");
@@ -458,14 +464,14 @@ uint32_t dumpsys_mm_info_func(char *buf, uint32_t len)
     dump_kmm_statistic_info(g_kmm_head);
     VGF(VALGRIND_MAKE_MEM_NOACCESS(g_kmm_head, sizeof(k_mm_head)));
 
-    RHINO_CRITICAL_EXIT();
+#if (RHINO_CONFIG_MM_REGION_MUTEX == 1)
+    krhino_mutex_unlock(&g_kmm_head->mm_mutex);
+#endif
 
     return RHINO_SUCCESS;
 }
 
-
 #endif
-
 
 #endif
 

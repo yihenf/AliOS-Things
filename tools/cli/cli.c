@@ -325,23 +325,57 @@ static void tab_complete(char *inbuf, unsigned int *bp)
  */
 static int get_input(char *inbuf, unsigned int *bp)
 {
+    int esc = 0, key1, key2;
     if (inbuf == NULL) {
         aos_cli_printf("inbuf_null\r\n");
         return 0;
     }
 
+    cli->his_idx = (cli->his_cur + HIS_SIZE - 1) % HIS_SIZE;
     while (cli_getchar(&inbuf[*bp]) == 1) {
-        if (inbuf[*bp] == RET_CHAR) {
-            continue;
-        }
-        if (inbuf[*bp] == END_CHAR) {   /* end of input line */
+        char c = inbuf[*bp];
+        if (c == RET_CHAR || c == END_CHAR) {   /* end of input line */
             inbuf[*bp] = '\0';
             *bp = 0;
             return 1;
         }
 
-        if ((inbuf[*bp] == 0x08) || /* backspace */
-            (inbuf[*bp] == 0x7f)) { /* DEL */
+        if (c == 0x1b) { /* escape sequence */
+            esc = 1;
+            key1 = -1;
+            key2 = -1;
+            continue;
+        }
+
+        if (esc) {
+            if (key1 < 0) {
+                key1 = c;
+                continue;
+            }
+
+            key2 = c;
+            esc = 0; /* quit escape sequence */
+            if (key1 == 0x5b && key2 == 0x41) { /* UP */
+                char *cmd = cli->history[cli->his_idx];
+                cli->his_idx = (cli->his_idx + HIS_SIZE - 1) % HIS_SIZE;
+                strncpy(inbuf, cmd, INBUF_SIZE);
+                printf("\r" PROMPT "%s", inbuf);
+                *bp = strlen(inbuf);
+                continue;
+            }
+
+            if (key1 == 0x5b && key2 == 0x42) { /* DOWN */
+                char *cmd = cli->history[cli->his_idx];
+                cli->his_idx = (cli->his_idx + 1) % HIS_SIZE;
+                strncpy(inbuf, cmd, INBUF_SIZE);
+                printf("\r" PROMPT "%s", inbuf);
+                *bp = strlen(inbuf);
+                continue;
+            }
+        }
+
+        if ((c == 0x08) || /* backspace */
+            (c == 0x7f)) { /* DEL */
             if (*bp > 0) {
                 (*bp)--;
                 if (!cli->echo_disabled) {
@@ -352,14 +386,14 @@ static int get_input(char *inbuf, unsigned int *bp)
             continue;
         }
 
-        if (inbuf[*bp] == '\t') {
+        if (c == '\t') {
             inbuf[*bp] = '\0';
             tab_complete(inbuf, bp);
             continue;
         }
 
         if (!cli->echo_disabled) {
-            printf("%c", inbuf[*bp]);
+            printf("%c", c);
             fflush(stdout);
         }
 
@@ -417,6 +451,11 @@ static void cli_main(void *data)
                 break;
             }
 #endif
+            if (strlen(cli->inbuf) > 0) {
+                strncpy(cli->history[cli->his_cur], cli->inbuf, INBUF_SIZE);
+                cli->his_cur = (cli->his_cur + 1) % HIS_SIZE;
+            }
+
             ret = handle_input(msg);
             if (ret == 1) {
                 print_bad_command(msg);
@@ -449,7 +488,10 @@ static void wifi_debug_cmd(char *buf, int len, int argc, char **argv);
 #ifdef CONFIG_NET_LWIP
 static void tftp_cmd(char *buf, int len, int argc, char **argv);
 #endif /* CONFIG_NET_LWIP */
+#ifndef CONFIG_NO_TCPIP
 static void udp_cmd(char *buf, int len, int argc, char **argv);
+#endif
+static void log_cmd(char *buf, int len, int argc, char **argv);
 
 static const struct cli_command built_ins[] = {
     {"help",        NULL,       help_cmd},
@@ -475,6 +517,7 @@ static const struct cli_command built_ins[] = {
     {"time",        "system time",       uptime_cmd},
     {"ota",         "system ota",        ota_cmd},
     {"wifi_debug",  "wifi debug mode",   wifi_debug_cmd},
+    {"loglevel",    "set log level",     log_cmd},
 };
 
 /* Built-in "help" command: prints all registered commands and their help
@@ -563,6 +606,33 @@ static void udp_cmd(char *buf, int len, int argc, char **argv)
     close(sockfd);
 }
 #endif
+
+static void log_cmd(char *buf, int len, int argc, char **argv)
+{
+    const char *lvls[] = {
+        [AOS_LL_FATAL] = "fatal",
+        [AOS_LL_ERROR] = "error",
+        [AOS_LL_WARN]  = "warn",
+        [AOS_LL_INFO]  = "info",
+        [AOS_LL_DEBUG] = "debug",
+    };
+
+    if (argc < 2) {
+        aos_cli_printf("log level : %02x\r\n", aos_get_log_level());
+        return;
+    }
+
+    int i;
+    for (i=0;i<sizeof(lvls)/sizeof(lvls[0]);i++) {
+        if (strncmp(lvls[i], argv[1], strlen(lvls[i])+1) != 0)
+            continue;
+
+        aos_set_log_level(i);
+        aos_cli_printf("set log level success\r\n");
+        return;
+    }
+    aos_cli_printf("set log level fail\r\n");
+}
 
 static void task_cmd(char *buf, int len, int argc, char **argv)
 {

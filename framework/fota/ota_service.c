@@ -48,7 +48,8 @@ const char *ota_info = "{\"md5\":\"6B21342306D0F619AF97006B7025D18A\","
         "\"size\": \"265694 \",\"uuid\": \"5B7CFD5C6B1D6A231F5FB6B7DB2B71FD\",\"version\": \"v2.0.0.1\",\"zip\": \"0\"}";
 */
 //const char *ota_info = "{\"uuid\": \"5B7CFD5C6B1D6A231F5FB6B7DB2B71FD\"}";
-void do_update(int len,  const char *buf)
+
+static void update_action(void *buf)
 {
     LOGD(TAG, "begin do update %s" , (char *)buf);
     if (!buf) {
@@ -57,10 +58,19 @@ void do_update(int len,  const char *buf)
     }
     ota_response_params response_parmas;
     ota_set_callbacks(ota_hal_write_cb, ota_hal_finish_cb);
-    if (0 == platform_ota_parse_response(buf, strlen((char *)buf), &response_parmas)) {
+    if (0 == platform_ota_parse_response((char *)buf, strlen((char *)buf), &response_parmas)) {
         ota_do_update_packet(&response_parmas, &ota_request_parmas, ota_write_flash_callback,
                              ota_finish_callbak);
     }
+}
+
+void do_update(int len,  const char *buf)
+{
+#ifdef STM32L475xx
+    update_action(buf);
+#else
+    aos_schedule_call(update_action, (void *)buf);
+#endif
 }
 
 void cancel_update(int len, const char *buf)
@@ -97,7 +107,7 @@ static void init_device_parmas()
 #endif
 
     ota_request_parmas.secondary_version = aos_get_app_version();
-    ota_request_parmas.product_type = aos_get_product_model();
+    //ota_request_parmas.product_type = aos_get_product_model();
     ota_request_parmas.device_uuid = platform_ota_get_id();
 }
 

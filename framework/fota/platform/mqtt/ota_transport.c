@@ -384,7 +384,9 @@ int8_t platform_ota_status_post(int status, int progress)
         OTA_LOG_E("Report progress failed");
         return -1;
     }
-
+#ifdef STM32L475xx
+    IOT_MQTT_Yield(g_ota_device_info.pclient, 1000);
+#endif
     ret = 0;
     return ret;
 }
