@@ -1064,20 +1064,16 @@ SUITE(test_yloop) = {
 
 void test_certificate(void)
 {
-    if (0 == dump_test_config()) {
-        printf("test start!\r\n");
-        ADD_SUITE(test_mm);
-        ADD_SUITE(test_task);
-        ADD_SUITE(test_task_comm);
-        ADD_SUITE(test_timer);
-        ADD_SUITE(test_kv);
-        ADD_SUITE(test_yloop);
-        cut_main(0, NULL);
-        printf("test finished!\r\n");
-    }
-    else {
-        printf("test error!\r\n");
-    }
+    dump_test_config();
+
+    ADD_SUITE(test_mm);
+    ADD_SUITE(test_task);
+    ADD_SUITE(test_task_comm);
+    ADD_SUITE(test_timer);
+    ADD_SUITE(test_kv);
+    ADD_SUITE(test_yloop);
+
+    cut_main(0, NULL);
 }
 AOS_TESTCASE(test_certificate);
 
