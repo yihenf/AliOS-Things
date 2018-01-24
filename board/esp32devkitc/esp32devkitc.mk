@@ -8,6 +8,7 @@ SUPPORT_BINS        := no
 # todo: remove these after rhino/lwip ready
 vcall               ?= rhino
 
+CURRENT_TIME = $(shell /bin/date +%Y%m%d.%H%M)
 define get-os-version
 "AOS-R"-$(CURRENT_TIME)
 endef

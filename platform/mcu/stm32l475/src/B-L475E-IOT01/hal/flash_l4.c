@@ -52,7 +52,8 @@
 #include <stdbool.h>
 #include "stm32l4xx.h"
 #include "stm32l4xx_hal_flash.h"
-#include <aos/aos.h>
+
+
 /* Private typedef -----------------------------------------------------------*/
 /* Private defines -----------------------------------------------------------*/
 #define ROUND_DOWN(a,b) (((a) / (b)) * (b))
@@ -208,7 +209,6 @@ int FLASH_get_pageInBank(uint32_t addr)
   return page;
 }
 
-
 /**
   * @brief  Update a chunk of the FLASH memory.
   * @note   The FLASH chunk must no cross a FLASH bank boundary.
@@ -224,13 +224,8 @@ int FLASH_update(uint32_t dst_addr, const void *data, uint32_t size)
   int ret = 0;
   int remaining = size;
   uint8_t * src_addr = (uint8_t *) data;
-
-  uint64_t * page_cache = NULL;
-  page_cache = (uint64_t *)aos_malloc(FLASH_PAGE_SIZE);
-  if (page_cache == NULL)
-    return -1;
-  memset(page_cache, 0, FLASH_PAGE_SIZE);
-
+  uint64_t page_cache[FLASH_PAGE_SIZE/sizeof(uint64_t)];
+ 
 	__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
 
   do {
@@ -264,7 +259,6 @@ int FLASH_update(uint32_t dst_addr, const void *data, uint32_t size)
     }
   } while ((ret == 0) && (remaining > 0));
   
-  aos_free(page_cache);
   return ret;
 }
 

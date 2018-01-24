@@ -20,6 +20,7 @@ static void teardown(void)
 {
 }
 
+
 extern void aosapi_kernel_sys_test_entry(yunit_test_suite_t *suite);
 extern void aosapi_kernel_task_test_entry(yunit_test_suite_t *suite);
 extern void aosapi_kernel_mutex_test_entry(yunit_test_suite_t *suite);
@@ -28,7 +29,7 @@ extern void aosapi_kernel_queue_test_entry(yunit_test_suite_t *suite);
 extern void aosapi_kernel_workqueue_test_entry(yunit_test_suite_t *suite);
 extern void aosapi_kernel_mm_test_entry(yunit_test_suite_t *suite);
 extern void aosapi_kernel_sem_test_entry(yunit_test_suite_t *suite);
-extern void aosapi_kernel_event_test_entry(yunit_test_suite_t *suite);
+
 
 void test_aosapi(void)
 {
@@ -45,6 +46,5 @@ void test_aosapi(void)
 	aosapi_kernel_queue_test_entry(suite);
 	aosapi_kernel_mm_test_entry(suite);
 	aosapi_kernel_workqueue_test_entry(suite);
-	aosapi_kernel_event_test_entry(suite);
 }
 AOS_TESTCASE(test_aosapi);

@@ -1276,12 +1276,12 @@ int sal_sendto(int s, const void *data, size_t size, int flags,
         return ERR_ARG;
     }
 
-    
+    LOCK_SAL_CORE;
     /* TODO have no consider tcp server send to client*/
     if (NETCONNTYPE_GROUP(pstsalsock->conn->type) == NETCONN_TCP) {
         if (pstsalsock->conn->state == NETCONN_NONE) {
             SAL_ERROR("sal_sendto socket %d connect state is %d\n", s, pstsalsock->conn->state);
-            
+            UNLOCK_SAL_CORE;
             return ERR_VAL;
         }
     }
@@ -1295,7 +1295,7 @@ int sal_sendto(int s, const void *data, size_t size, int flags,
                 err = salnetconn_connect(pstsalsock->conn, ip_str, remote_port);
                 if (ERR_OK != err) {
                     SAL_ERROR("sal_sendto fail to connect socket %d\n", s);
-                    
+                    UNLOCK_SAL_CORE;
                     return err;
                 }
             }
@@ -1303,13 +1303,15 @@ int sal_sendto(int s, const void *data, size_t size, int flags,
             if (pstsalsock->conn->state == NETCONN_NONE) {
                 SAL_ERROR("sal_sendto  socket %d is not connected and "
                           "input addr is null, cannot send packet\n", s);
+                UNLOCK_SAL_CORE;
                 return ERR_ARG;
             }
         }
     }
 
     err = sal_module_send(s, (uint8_t *)data, size, NULL, -1);
-  
+    UNLOCK_SAL_CORE;
+    
     if (err != ERR_OK){
         return -1;
     }
@@ -1322,6 +1324,11 @@ int sal_send(int s, const void *data, size_t size, int flags)
     SAL_DEBUG("sal_send(%d, flags=0x%x)\n", s, flags);
 
     return sal_sendto(s, data, size, flags, NULL, 0);
+    /*TODO: 1、先认为remote adrr和port可以通过conn中获取, 具体的remote ip
+               和port信息的填写需要再分析
+            2、先不考虑ipv6
+            3、发包控制的pcb暂时没有，所以目前发包最大长度先写死一个宏
+    */
 }
 
 int sal_write(int s, const void *data, size_t size)
@@ -1346,7 +1353,7 @@ int sal_write(int s, const void *data, size_t size)
     return sal_send(s, data, size, 0);
 }
 
-static int salnetconn_packet_input(sal_netconn_t *conn, void *data, size_t len, char remote_ip[16], uint16_t remote_port)
+static int salnetconn_packet_input(sal_netconn_t *conn, void *data, size_t len, ip_addr_t *addr, u16_t port)
 {
     sal_netbuf_t *buf;
 
@@ -1371,14 +1378,11 @@ static int salnetconn_packet_input(sal_netconn_t *conn, void *data, size_t len, 
     }
     memcpy(buf->payload, data, len);
     buf->len = len;
-    #if 0
     if (NULL != addr){
         ip_addr_set(&buf->addr, addr);
     }
-    #endif
-    buf->port = remote_port;
-    
-    
+    buf->port = port;
+
     if(sal_mbox_trypost(&conn->recvmbox, buf) != ERR_OK){
         aos_free(buf->payload);
         aos_free(buf);
@@ -1389,7 +1393,7 @@ static int salnetconn_packet_input(sal_netconn_t *conn, void *data, size_t len, 
     return 0;
 }
 
-int sal_packet_input(int s, void *data, size_t len, char remote_ip[16], uint16_t remote_port)
+int sal_packet_input(int s, void *data, size_t len, ip_addr_t *addr, u16_t port)
 {
     struct sal_sock *sock = NULL;
     int             ret = 0;
@@ -1409,12 +1413,12 @@ int sal_packet_input(int s, void *data, size_t len, char remote_ip[16], uint16_t
         SAL_ERROR("socket %d invalid for haven't creat connnet yet\n");
         return -1;
     }
-    
-    ret = salnetconn_packet_input(sock->conn, data, len, remote_ip, remote_port);
-    
+
+    //LOCK_SAL_CORE;
+    ret = salnetconn_packet_input(sock->conn, data, len, addr, port);
+    //UNLOCK_SAL_CORE;
     if (ret){
         SAL_ERROR("sal packet input fail\n");
-        return -1;
     }
     
     sal_deal_event(s, NETCONN_EVT_RCVPLUS);
@@ -1998,8 +2002,8 @@ int sal_fcntl(int s, int cmd, int val)
 
 int sal_shutdown(int s, int how)
 {
-    SAL_ERROR("%s call stub for now\n", __func__);
-    return 0;
+    SAL_ERROR("%s call sal_close for now\n", __func__);
+    return sal_close(s);
 }
 
 int sal_getaddrinfo(const char *nodename, const char *servname,
@@ -2127,5 +2131,17 @@ void sal_freeaddrinfo(struct addrinfo *ai)
     if (ai != NULL) {
         aos_free(ai);
     }
+}
+
+const void *ur_adapter_get_default_ipaddr(void)
+{
+    SAL_ERROR("Error: Calling %s stub !\n", __FUNCTION__);
+    return NULL;
+}
+
+const void *ur_adapter_get_mcast_ipaddr(void)
+{
+    SAL_ERROR("Error: Calling %s stub !\n", __FUNCTION__);
+    return NULL;
 }
 

@@ -1,12 +1,11 @@
 #!/usr/bin/python
 
-import os, sys, time, socket, ssl, traceback
-import subprocess, thread, threading, random, re
+import os, sys, time, socket, re, pdb, traceback
+import subprocess, thread, threading, random
 from operator import itemgetter
 import TBframe
 
-MAX_MSG_LENTH = 8192
-ENCRYPT = False
+MAX_MSG_LENTH = 2000
 DEBUG = True
 
 class ConnectionLost(Exception):
@@ -165,13 +164,16 @@ class Autotest:
                         self.cmd_excute_event.set()
             except ConnectionLost:
                 self.connected = False
-                self.service_socket.close()
                 print 'connection to server lost, try reconnecting...'
+                self.service_socket.close()
+                self.service_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 while True:
-                    result = self.connect_to_server(self.server_ip, self.server_port)
-                    if result == 'success':
+                    try:
+                        self.service_socket.connect((self.server_ip, self.server_port))
+                        self.connected = True
                         break
-                    time.sleep(1)
+                    except:
+                        time.sleep(1)
                 print 'connection to server resumed'
                 random.seed()
                 time.sleep(1.2 + random.random())
@@ -433,23 +435,14 @@ class Autotest:
     def get_device_list(self):
         return list(self.device_list)
 
-    def connect_to_server(self, server_ip, server_port):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        if ENCRYPT:
-            sock = ssl.wrap_socket(sock, cert_reqs=ssl.CERT_REQUIRED, ca_certs='server_cert.pem')
-        try:
-            sock.connect((server_ip, server_port))
-            self.service_socket = sock
-            self.connected = True
-            return "success"
-        except:
-            return "fail"
-
     def start(self, server_ip, server_port, logname=None):
+        #connect to server
         self.server_ip = server_ip
         self.server_port = server_port
-        result = self.connect_to_server(server_ip, server_port)
-        if result != 'success':
+        self.service_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            self.service_socket.connect((server_ip, server_port))
+        except:
             print "connect to server {0}:{1} failed".format(server_ip, server_port)
             return False
 

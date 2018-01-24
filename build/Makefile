@@ -196,7 +196,6 @@ $(BUILD_STRING): main_app $(if $(SUB_BUILD),,.gdbinit .gdbinit$(BINSTYPE_LOWER))
 main_app: $(OUTPUT_DIR)/config.mk $(YOS_SDK_PRE_APP_BUILDS) $(MAKEFILES_PATH)/aos_target_build.mk
 	$(if $(BINS_ERROR), $(call BINS_EXIT))
 	$(QUIET)$(ECHO) Build AOS Now
-	$(QUIET)$(ECHO) TOOLCHAIN_PATH=$(TOOLCHAIN_PATH)
 	$(QUIET)$(call MKDIR, $(OUTPUT_DIR)/binary)
 	$(QUIET)$(call MKDIR, $(OUTPUT_DIR)/modules)
 	$(QUIET)$(call MKDIR, $(OUTPUT_DIR)/libraries)
@@ -208,8 +207,7 @@ main_app: $(OUTPUT_DIR)/config.mk $(YOS_SDK_PRE_APP_BUILDS) $(MAKEFILES_PATH)/ao
 ifeq ($(SUB_BUILD),)
 .gdbinit: $(OUTPUT_DIR)/config.mk $(MAKEFILES_PATH)/aos_host_cmd.mk main_app
 	$(QUIET)$(ECHO) Making $@
-	$(QUIET)$(ECHO) '#GDB_PATH=$(GDB_COMMAND)' > $@
-	$(QUIET)$(ECHO) set remotetimeout 20 >> $@
+	$(QUIET)$(ECHO) set remotetimeout 20 > $@
 	$(QUIET)$(ECHO) $(GDB_KILL_OPENOCD) >> $@
 	$(QUIET)$(ECHO) $(GDBINIT_STRING) >> $@
 

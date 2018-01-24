@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 
-#if defined (__CC_ARM)
+#if defined (__CC_ARM) && defined(__MICROLIB)
 void __aeabi_assert(const char *expr, const char *file, int line)
 {
     while (1);

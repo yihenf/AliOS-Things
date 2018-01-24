@@ -207,10 +207,8 @@ RHINO_INLINE void _ready_list_add_head(runqueue_t *rq, ktask_t *task)
 #if (RHINO_CONFIG_CPU_NUM > 1)
 static void task_sched_to_cpu(runqueue_t *rq, ktask_t *task, uint8_t cur_cpu_num)
 {
-    uint8_t i;
-    uint8_t low_pri;
-
     (void)rq;
+    uint8_t i;
 
     if (g_sys_stat == RHINO_RUNNING) {
         if (task->cpu_binded == 1) {
@@ -220,27 +218,18 @@ static void task_sched_to_cpu(runqueue_t *rq, ktask_t *task, uint8_t cur_cpu_num
                 }
             }
         } else {
-            /* if other cpu is in idle state just notify it */
             for (i = 0; i < RHINO_CONFIG_CPU_NUM; i++) {
                 if (g_active_task[i]->prio == RHINO_IDLE_PRI) {
                     if (i != cur_cpu_num) {
                         cpu_signal(i);
                     }
+
                     return;
                 }
             }
 
-            /* find the lowest pri */
-            low_pri = g_active_task[0]->prio;
-            for (i = 0; i < RHINO_CONFIG_CPU_NUM - 1; i++) {
-                if (low_pri < g_active_task[i + 1]->prio) {
-                     low_pri = g_active_task[i + 1]->prio;
-                }
-            }
-
-            /* which cpu run the lowest pri, just notify it */
             for (i = 0; i < RHINO_CONFIG_CPU_NUM; i++) {
-                if (low_pri == g_active_task[i]->prio) {
+                if (task->prio <= g_active_task[i]->prio) {
                     if (i != cur_cpu_num) {
                         cpu_signal(i);
                     }

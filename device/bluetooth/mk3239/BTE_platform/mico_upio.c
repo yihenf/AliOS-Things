@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2015-2017 Alibaba Group Holding Limited
+ */
+
 /*****************************************************************************
  **
  **  Name    upio_bby.c
@@ -8,7 +12,7 @@
  **
  *****************************************************************************/
 #include "buildcfg.h"
-#include "mico_bt_dev.h"
+#include "aos_bt_dev.h"
 #include "include/upio.h"
 #include "platform_bluetooth.h"
 

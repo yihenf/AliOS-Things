@@ -10,8 +10,9 @@ $(NAME)_SOURCES := \
     json_parser.c \
     json_token.c \
     mem_stats.c \
-    string_utils.c
-    
+    string_utils.c \
+    lite-utils_prog.c
+
 $(NAME)_COMPONENTS += iotx-utils.LITE-log
 
 # TODO: fix warnings

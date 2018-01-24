@@ -30,7 +30,7 @@
 #define RHINO_CONFIG_TIMER                   0
 #endif
 #ifndef RHINO_CONFIG_BUF_QUEUE
-#define RHINO_CONFIG_BUF_QUEUE               1
+#define RHINO_CONFIG_BUF_QUEUE               0
 #endif
 #ifndef RHINO_CONFIG_MM_BLK
 #define RHINO_CONFIG_MM_BLK                  1
