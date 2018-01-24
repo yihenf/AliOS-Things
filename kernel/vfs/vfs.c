@@ -13,7 +13,7 @@
 #include <limits.h>
 #include <string.h>
 
-#if defined (__ICCARM__) || defined (__CC_ARM)
+#ifdef __ICCARM__
 #include <sys/select.h>
 #endif
 
