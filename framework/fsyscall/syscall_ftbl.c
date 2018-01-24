@@ -14,9 +14,8 @@
 #include <json_parser.h>
 #include <config.h>
 #endif
-#ifdef AOS_NETMGR
 #include <netmgr.h>
-#endif
+
 
 extern const char *gateway_get_uuid(void);
 extern bool gateway_is_connected(void);

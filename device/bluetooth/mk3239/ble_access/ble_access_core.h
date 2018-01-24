@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2015-2017 Alibaba Group Holding Limited
+ */
+
 #ifndef __BLE_ACCESS_CORE_H__
 #define __BLE_ACCESS_CORE_H__
 
@@ -88,7 +92,7 @@ typedef struct {
     uint32_t device_id;
     union {
         /* used by BLE_ACCESS_REQ_DEV_SCAN */
-        mico_bool_t start;
+        aos_bool_t start;
         /* used by BLE_ACCESS_REQ_DEV_DISC */
         uint32_t timeout;
     } p;
@@ -405,7 +409,7 @@ extern OSStatus ble_access_update_characteristic_value(uint32_t dev_id, uint16_t
  */
 extern OSStatus ble_access_enable_notification(uint32_t dev_id,
                                                const ble_access_attribute_t *attr,
-                                               mico_bool_t notify);
+                                               aos_bool_t notify);
 
 /*
  * Compare two UUID type.
@@ -415,7 +419,7 @@ extern OSStatus ble_access_enable_notification(uint32_t dev_id,
  *
  * @return 0 if they are equal, otherwise non-zero.
  */
-extern mico_bool_t ble_access_uuid_compare(const ble_access_uuid_t *uuid1, const ble_access_uuid_t *uuid2);
+extern aos_bool_t ble_access_uuid_compare(const ble_access_uuid_t *uuid1, const ble_access_uuid_t *uuid2);
 
 /*
  * Calculate device ID by Device Address
@@ -424,7 +428,7 @@ extern mico_bool_t ble_access_uuid_compare(const ble_access_uuid_t *uuid1, const
  *
  * @return device ID or zero
  */
-extern uint32_t ble_access_calculate_device_id(const mico_bt_device_address_t addr);
+extern uint32_t ble_access_calculate_device_id(const aos_bt_device_address_t addr);
 
 /*
  * Generate a device address by device ID
@@ -434,7 +438,7 @@ extern uint32_t ble_access_calculate_device_id(const mico_bt_device_address_t ad
  *
  * @return kNoErr if successful.
  */
-extern OSStatus ble_access_generate_device_address(mico_bt_device_address_t addr, uint32_t device_id);
+extern OSStatus ble_access_generate_device_address(aos_bt_device_address_t addr, uint32_t device_id);
 
 #ifdef __cplusplus
 }

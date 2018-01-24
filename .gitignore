@@ -24,4 +24,3 @@ example/flash/flash.mk
 example/flash/main.c
 example/flash/README.md
 settings.json
-build/cmd/win32/Python27/Lib/encodings/*.pyc

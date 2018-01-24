@@ -457,7 +457,5 @@ The STM32F107 allows computing and verifying the IP, UDP, TCP and ICMP checksums
 
 #define LWIP_TIMEVAL_PRIVATE 0
 
-#define LWIP_PRIVATE_FD_SET
-
 #endif /* __LWIPOPTS_H__ */
 

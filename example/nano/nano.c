@@ -2,7 +2,6 @@
  * Copyright (C) 2015-2017 Alibaba Group Holding Limited
  */
 
-#include <stdio.h>
 #include <aos/aos.h>
 
 static void app_delayed_action(void *arg)

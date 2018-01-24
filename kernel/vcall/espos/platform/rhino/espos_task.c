@@ -36,7 +36,6 @@ esp_err_t espos_task_create_on_cpu (
     ktask_t **ptask = (ktask_t **)task;
     uint8_t auto_run;
     extern void _cleanup_r(struct _reent* r);
-    cpu_stack_t os_task_size;
 
     if (name == NULL) {
     	name = "default_task";
@@ -52,16 +51,10 @@ esp_err_t espos_task_create_on_cpu (
         auto_run = 0;
     }
 
-#if defined(ESPOS_FOR_ESP32)
-    os_task_size = stack_size / sizeof(cpu_stack_t);
-#elif defined(ESPOS_FOR_ESP8266)
-    os_task_size = stack_size;
-#endif
-
     prio = ESPOS_TASK_PRIO_NUM - prio;
     prio = prio <= 0 ? 1 : prio;
     ret = krhino_task_dyn_create(ptask, name, arg, prio, ticks,
-                        os_task_size, entry, auto_run);
+                        stack_size / sizeof(cpu_stack_t), entry, auto_run);
 
     /* The following code may open it later */
     #if 0
@@ -223,10 +216,6 @@ espos_cpu_t espos_task_get_affinity(espos_task_t task)
     return 0;
 }
 
-size_t espos_task_prio_num(void)
-{
-    return RHINO_CONFIG_USER_PRI_MAX + 1;
-}
 
 #if 0
 struct _reent* __getreent()
@@ -244,7 +233,6 @@ struct _reent* __getreent()
 }
 #endif
 
-#if defined(ESPOS_FOR_ESP32)
 struct _reent* __getreent()
 {
     ktask_t *task = krhino_cur_task_get();
@@ -255,4 +243,4 @@ struct _reent* __getreent()
         return _GLOBAL_REENT;;
     }
 }
-#endif
+

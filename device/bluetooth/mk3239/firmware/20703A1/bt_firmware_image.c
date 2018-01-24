@@ -6,7 +6,6 @@
 **                                                                           *
 **  Copyright (c) 2015, Broadcom Corp., All Rights Reserved.                 *
 ******************************************************************************/
-
 #include <stdint.h>
 
 /* FILE-CSTYLED */

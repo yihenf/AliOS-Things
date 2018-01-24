@@ -13,7 +13,7 @@
 #include <limits.h>
 #include <string.h>
 
-#if defined (__ICCARM__) || defined (__CC_ARM)
+#ifdef __ICCARM__
 #include <sys/select.h>
 #endif
 
@@ -697,7 +697,7 @@ AOS_EXPORT(int, aos_mkdir, const char *);
 
 #if (AOS_CONFIG_VFS_POLL_SUPPORT>0)
 
-#if !defined(WITH_LWIP) && !defined(WITH_SAL)&& defined(VCALL_RHINO)
+#if !defined(WITH_LWIP) && defined(VCALL_RHINO)
 #define NEED_WAIT_IO
 #endif
 

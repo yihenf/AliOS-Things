@@ -6,10 +6,7 @@ $(NAME)_SOURCES     += device.c
 $(NAME)_SOURCES     += vfs_inode.c
 $(NAME)_SOURCES     += vfs_register.c
 
-ifeq ($(HOST_ARCH),linux)
 $(NAME)_DEFINES     += IO_NEED_TRAP
-endif
-
 #default gcc
 ifeq ($(COMPILER),)
 $(NAME)_CFLAGS      += -Wall -Werror

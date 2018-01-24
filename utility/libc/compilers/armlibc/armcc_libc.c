@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <sys/time.h>
 
-#if defined (__CC_ARM)
+#if defined (__CC_ARM) && defined(__MICROLIB)
 void __aeabi_assert(const char *expr, const char *file, int line)
 {
     while (1);
@@ -24,7 +24,6 @@ extern void *aos_malloc(unsigned int size);
 extern void aos_alloc_trace(void *addr, size_t allocator);
 extern void aos_free(void *mem);
 extern void *aos_realloc(void *mem, unsigned int size);
-extern int32_t aos_uart_send(void *data, uint32_t size, uint32_t timeout);
 
 void *malloc(size_t size)
 {
@@ -81,12 +80,5 @@ char * strdup(const char *s)
     if (dup_str == NULL)
         return NULL;
     return (char *)memcpy(dup_str, s, len);
-}
-
-#pragma weak fputc
-int fputc(int ch, FILE *f)
-{
-    /* Send data. */
-    return aos_uart_send((uint8_t *)(&ch), 1, 1000);
 }
 #endif

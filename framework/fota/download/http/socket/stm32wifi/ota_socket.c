@@ -45,6 +45,8 @@ int ota_socket_send(int socket, const char *buf, size_t len)
 {
     WIFI_Status_t ret;
     uint16_t send_size;
+    uint8_t ip_address[4];
+    char    ip[16];
 
     if (socket < 0) {
         OTA_LOG_E("ota_socket_send: invalid socket fd\n");
@@ -82,7 +84,7 @@ int ota_socket_recv(int socket,  char *buf, size_t len)
     int err_count = 0;
     do {
         ret = WIFI_ReceiveData((uint8_t)socket,
-                               (uint8_t*)buf, (uint16_t)len,
+                               buf, (uint16_t)len,
                                &recv_size, WIFI_READ_TIMEOUT);
         if (ret != WIFI_STATUS_OK) {
             OTA_LOG_E("ota_socket_recv: receive data fail - %d\n", ret);

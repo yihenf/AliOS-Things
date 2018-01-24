@@ -1,4 +1,4 @@
-NAME := lib_ble_dual_mode
+NAME := Lib_Bluetooth_Embedded_Dual_mode_Stack_for_$(BT_CHIP)$(BT_CHIP_REVISION)
 
 BTE_PLATFORM_DIR := ../BTE_platform
 
@@ -19,7 +19,7 @@ endif
 
 
 # Include appropriate firmware as component
-$(NAME)_COMPONENTS += bluetooth/mk3239/firmware
+$(NAME)_COMPONENTS += bluetooth/firmware
 
 $(NAME)_SOURCES += $(BTE_PLATFORM_DIR)/mico_bt_bus.c \
                    $(BTE_PLATFORM_DIR)/mico_bt_hcd.c \
@@ -28,3 +28,4 @@ $(NAME)_SOURCES += $(BTE_PLATFORM_DIR)/mico_bt_bus.c \
                    $(BTE_PLATFORM_DIR)/mico_upio.c
                    
 VALID_PLATFORMS := MK3238 MK3239
+                   

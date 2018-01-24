@@ -15,13 +15,8 @@ else
 HOST_INSTRUCTION_SET := THUMB
 endif
 
-TOOLCHAIN_PATH    ?=
 TOOLCHAIN_PREFIX  := arm-none-eabi-
 TOOLCHAIN_VERSION := 5_4-2016q3-20160926
-
-ifneq (,$(wildcard $(TOOLS_ROOT)/compiler/arm-none-eabi-$(TOOLCHAIN_VERSION)/$(HOST_OS)/bin))
-TOOLCHAIN_PATH    := $(TOOLS_ROOT)/compiler/arm-none-eabi-$(TOOLCHAIN_VERSION)/$(HOST_OS)/bin/
-endif
 
 BINS ?=
 
@@ -30,15 +25,12 @@ ifeq ($(HOST_OS),Win32)
 # Windows settings
 ################
 
-ifeq (,$(TOOLCHAIN_PATH))
-SYSTEM_GCC_PATH = $(shell where $(TOOLCHAIN_PREFIX)gcc.exe)
-ifneq (,$(findstring $(TOOLCHAIN_PREFIX)gcc.exe,$(SYSTEM_GCC_PATH)))
-SYSTEM_TOOLCHAIN_PATH = $(subst $(TOOLCHAIN_PREFIX)gcc.exe,,$(SYSTEM_GCC_PATH))
-TOOLCHAIN_PATH := $(SYSTEM_TOOLCHAIN_PATH)
+$(eval GCC_VER := $(shell arm-none-eabi-gcc --version | findstr "Copyright"))
+ifeq ($(TOOLCHAIN_PATH),)
+ifeq ($(GCC_VER),)
+TOOLCHAIN_PATH := $(TOOLS_ROOT)/compiler/arm-none-eabi-$(TOOLCHAIN_VERSION)/Win32/bin/
 else
-DOWNLOAD_URL   = "https://launchpad.net/gcc-arm-embedded/+download"
-TOOLCHIAN_FILE = "gcc-arm-none-eabi-5_4-2016q3-20160926-win32.zip"
-$(error can not find compiler toolchain, please download $(TOOLCHIAN_FILE) from $(DOWNLOAD_URL) and unzip to $(TOOLS_ROOT)/compiler/arm-none-eabi-$(TOOLCHAIN_VERSION)/$(HOST_OS) folder)
+TOOLCHAIN_PATH :=
 endif
 endif
 
@@ -52,18 +44,8 @@ ifneq (,$(filter $(HOST_OS),Linux32 Linux64))
 # Linux 32/64-bit settings
 ################
 
-ifeq (,$(TOOLCHAIN_PATH))
-SYSTEM_GCC_PATH = $(shell which $(TOOLCHAIN_PREFIX)gcc)
-ifneq (,$(findstring $(TOOLCHAIN_PREFIX)gcc,$(SYSTEM_GCC_PATH)))
-SYSTEM_TOOLCHAIN_PATH = $(subst $(TOOLCHAIN_PREFIX)gcc,,$(SYSTEM_GCC_PATH))
-TOOLCHAIN_PATH := $(SYSTEM_TOOLCHAIN_PATH)
-else
-DOWNLOAD_URL   = "https://launchpad.net/gcc-arm-embedded/+download"
-TOOLCHIAN_FILE = "gcc-arm-none-eabi-5_4-2016q3-20160926-linux.tar.bz2"
-$(error can not find compiler toolchain, please download $(TOOLCHIAN_FILE) from $(DOWNLOAD_URL) and unzip to $(TOOLS_ROOT)/compiler/arm-none-eabi-$(TOOLCHAIN_VERSION)/$(HOST_OS) folder)
-endif
-endif
-
+export PATH       := $(TOOLS_ROOT)/compiler/arm-none-eabi-$(TOOLCHAIN_VERSION)/$(HOST_OS)/bin:$(PATH)
+TOOLCHAIN_PATH    ?=
 GDB_KILL_OPENOCD   = 'shell killall openocd'
 GDBINIT_STRING     = 'shell $(COMMON_TOOLS_PATH)dash -c "trap \\"\\" 2;$(OPENOCD_FULL_NAME) -f $(OPENOCD_CFG_PATH)interface/$(JTAG).cfg -f $(OPENOCD_CFG_PATH)$(HOST_OPENOCD)/$(HOST_OPENOCD).cfg -f $(OPENOCD_CFG_PATH)$(HOST_OPENOCD)/$(HOST_OPENOCD)_gdb_jtag.cfg -l $(OPENOCD_LOG_FILE) &"'
 GDB_COMMAND        = "$(TOOLCHAIN_PATH)$(TOOLCHAIN_PREFIX)gdb"
@@ -74,27 +56,18 @@ ifeq ($(HOST_OS),OSX)
 # OSX settings
 ################
 
-ifeq (,$(TOOLCHAIN_PATH))
-SYSTEM_GCC_PATH = $(shell which $(TOOLCHAIN_PREFIX)gcc)
-ifneq (,$(findstring $(TOOLCHAIN_PREFIX)gcc,$(SYSTEM_GCC_PATH)))
-SYSTEM_TOOLCHAIN_PATH = $(subst $(TOOLCHAIN_PREFIX)gcc,,$(SYSTEM_GCC_PATH))
-TOOLCHAIN_PATH := $(SYSTEM_TOOLCHAIN_PATH)
-else
-DOWNLOAD_URL   = "https://launchpad.net/gcc-arm-embedded/+download"
-TOOLCHIAN_FILE = "gcc-arm-none-eabi-5_4-2016q3-20160926-mac.tar.bz2"
-$(error can not find compiler toolchain, please download $(TOOLCHIAN_FILE) from $(DOWNLOAD_URL) and unzip to $(TOOLS_ROOT)/compiler/arm-none-eabi-$(TOOLCHAIN_VERSION)/$(HOST_OS) folder)
-endif
-endif
-
+export PATH       := $(TOOLS_ROOT)/compiler/arm-none-eabi-$(TOOLCHAIN_VERSION)/$(HOST_OS)/bin:$(PATH)
+TOOLCHAIN_PATH    ?=
 GDB_KILL_OPENOCD   = 'shell killall openocd_run'
 GDBINIT_STRING     = 'shell $(COMMON_TOOLS_PATH)dash -c "trap \\"\\" 2;$(OPENOCD_FULL_NAME) -f $(OPENOCD_CFG_PATH)interface/$(JTAG).cfg -f $(OPENOCD_CFG_PATH)$(HOST_OPENOCD)/$(HOST_OPENOCD).cfg -f $(OPENOCD_CFG_PATH)$(HOST_OPENOCD)/$(HOST_OPENOCD)_gdb_jtag.cfg -l $(OPENOCD_LOG_FILE) &"'
 GDB_COMMAND        = "$(TOOLCHAIN_PATH)$(TOOLCHAIN_PREFIX)gdb"
 
 else # OSX
-$(error unsupport OS $(HOST_OS))
+$(error incorrect 'make' used ($(MAKE)) - please use:  (Windows) .\make.exe <target_string>    (OS X, Linux) ./make <target_string>)
 endif # OSX
 endif # Linux32 Linux64 OSX
 endif # Win32
+
 
 # Notes on C++ options:
 # The next two CXXFLAGS reduce the size of C++ code by removing unneeded
@@ -116,7 +89,7 @@ endif # Win32
 
 CC      := "$(TOOLCHAIN_PATH)$(TOOLCHAIN_PREFIX)gcc$(EXECUTABLE_SUFFIX)"
 CXX     := "$(TOOLCHAIN_PATH)$(TOOLCHAIN_PREFIX)g++$(EXECUTABLE_SUFFIX)"
-AS      := $(CC)
+AS      := "$(TOOLCHAIN_PATH)$(TOOLCHAIN_PREFIX)as$(EXECUTABLE_SUFFIX)"
 AR      := "$(TOOLCHAIN_PATH)$(TOOLCHAIN_PREFIX)ar$(EXECUTABLE_SUFFIX)"
 LD      := "$(TOOLCHAIN_PATH)$(TOOLCHAIN_PREFIX)ld$(EXECUTABLE_SUFFIX)"
 CPP     := "$(TOOLCHAIN_PATH)$(TOOLCHAIN_PREFIX)cpp$(EXECUTABLE_SUFFIX)"
@@ -139,7 +112,7 @@ COMPILER_SPECIFIC_ARFLAGS_VERBOSE  := -v
 #debug: no optimize and log enable
 COMPILER_SPECIFIC_DEBUG_CFLAGS     := -DDEBUG -ggdb $(COMPILER_SPECIFIC_UNOPTIMIZED_CFLAGS)
 COMPILER_SPECIFIC_DEBUG_CXXFLAGS   := -DDEBUG -ggdb $(COMPILER_SPECIFIC_UNOPTIMIZED_CFLAGS)
-COMPILER_SPECIFIC_DEBUG_ASFLAGS    := -DDEBUG=1 -ggdb
+COMPILER_SPECIFIC_DEBUG_ASFLAGS    := --defsym DEBUG=1 -ggdb
 COMPILER_SPECIFIC_DEBUG_LDFLAGS    := -Wl,--gc-sections -Wl,--cref
 
 #release_log: optimize but log enable
@@ -185,7 +158,7 @@ endif
 ifeq ($(HOST_ARCH),Cortex-M4F)
 CPU_CFLAGS     := -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 CPU_CXXFLAGS   := -mthumb -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard
-CPU_ASMFLAGS   := $(CPU_CFLAGS)
+CPU_ASMFLAGS   := -mcpu=cortex-m4 -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 CPU_LDFLAGS    := -mthumb -mcpu=cortex-m4 -Wl,-A,thumb
 CLIB_LDFLAGS_NANO       += -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 CLIB_LDFLAGS_NANO_FLOAT += -mfpu=fpv4-sp-d16 -mfloat-abi=hard
@@ -194,21 +167,21 @@ endif
 ifeq ($(HOST_ARCH),Cortex-M4)
 CPU_CFLAGS     := -mthumb -mcpu=cortex-m4
 CPU_CXXFLAGS   := -mthumb -mcpu=cortex-m4
-CPU_ASMFLAGS   := $(CPU_CFLAGS)
+CPU_ASMFLAGS   := -mcpu=cortex-m4 -mfpu=softvfp
 CPU_LDFLAGS    := -mthumb -mcpu=cortex-m4 -Wl,-A,thumb
 endif
 
 ifeq ($(HOST_ARCH),Cortex-M3)
 CPU_CFLAGS   := -mthumb -mcpu=cortex-m3
 CPU_CXXFLAGS := -mthumb -mcpu=cortex-m3
-CPU_ASMFLAGS   := $(CPU_CFLAGS)
+CPU_ASMFLAGS := -mcpu=cortex-m3 -mfpu=softvfp
 CPU_LDFLAGS  := -mthumb -mcpu=cortex-m3 -Wl,-A,thumb
 endif
 
 ifeq ($(HOST_ARCH),Cortex-M0)
 CPU_CFLAGS   := -mthumb -mcpu=cortex-m0
 CPU_CXXFLAGS := -mthumb -mcpu=cortex-m0
-CPU_ASMFLAGS   := $(CPU_CFLAGS)
+CPU_ASMFLAGS := -mcpu=cortex-m0 -mthumb
 CPU_LDFLAGS  := -mthumb -mcpu=cortex-m0 -Wl,-A,thumb
 endif
 
@@ -266,10 +239,6 @@ SUBGDBINIT_STRING   = add-symbol-file $(BUILD_DIR)/eclipse_debug/$(BINSTYPE_LOWE
 else
 BINS_DOWNLOAD_ADDR = 0x13200
 endif # BINS
-
-STRIP_OUTPUT_PREFIX := -o 
-OBJCOPY_BIN_FLAGS   := -O binary -R .eh_frame -R .init -R .fini -R .comment -R .ARM.attributes 
-OBJCOPY_HEX_FLAGS   := -O ihex -R .eh_frame -R .init -R .fini -R .comment -R .ARM.attributes
 
 LINK_OUTPUT_SUFFIX :=.elf
 BIN_OUTPUT_SUFFIX  :=.bin

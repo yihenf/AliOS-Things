@@ -9,7 +9,6 @@
 extern "C" {
 #endif
 
-#include "umesh_config.h"
 #include "umesh_types.h"
 
 ur_error_t umesh_output_sid(struct pbuf *buf, uint16_t netid, uint16_t sid);
