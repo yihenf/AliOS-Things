@@ -7,6 +7,7 @@
 #include "frxt/xtensa_api.h"
 
 #include <k_api.h>
+#include "esp_log.h"
 
 /* ARMCC || IAR || GNU */
 #define FPU_AVL ((defined(__CC_ARM) && defined(__TARGET_FPU_VFP)) \
@@ -17,8 +18,10 @@ extern void _frxt_tick_timer_init(void);
 extern void _frxt_setup_switch();
 extern void task_switch();
 extern void _xt_user_exit(void);
-unsigned krhino_sys_run = {0};
-unsigned krhino_sys_nest = {0};
+unsigned krhino_sys_run[portNUM_PROCESSORS] = {0};
+unsigned krhino_sys_nest[portNUM_PROCESSORS] = {0};
+
+
 
 void *cpu_task_stack_init(cpu_stack_t *stack_base, size_t stack_size,
                           void *arg, task_entry_t entry)
@@ -90,16 +93,13 @@ void cpu_first_task_start()
     _xt_tick_divisor_init();
     /* Setup the hardware to generate the tick. */
     _frxt_tick_timer_init();
-    krhino_sys_run = 1;
-
+    krhino_sys_run[xPortGetCoreID()] = 1;
     __asm__ volatile ("call0    _frxt_dispatch\n");
 }
 
 void krhino_switch_context()
 {
     g_active_task[cpu_cur_get()] = g_preferred_ready_task[cpu_cur_get()];
-
-    // ets_printf("%x %s %d\n", g_active_task[cpu_cur_get()], g_active_task[cpu_cur_get()]->task_name, cpu_cur_get());
 }
 
 void cpu_intrpt_switch()
@@ -110,7 +110,6 @@ void cpu_intrpt_switch()
 
 void _krhino_tick_proc()
 {
-    // ets_printf("q1\n");
     krhino_intrpt_enter();
     krhino_tick_proc();
     krhino_intrpt_exit();

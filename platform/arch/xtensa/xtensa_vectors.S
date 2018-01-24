@@ -91,10 +91,24 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *******************************************************************************/
 
 #include "xtensa_rtos.h"
-
+#include "esp_panic.h"
+#include "sdkconfig.h"
+/*
+  Define for workaround: pin no-cpu-affinity tasks to a cpu when fpu is used.
+  Please change this when the tcb structure is changed
+*/
+#define TASKTCB_XCOREID_OFFSET (0x38+configMAX_TASK_NAME_LEN+3)&~3
+#define SUPPORT_YUNOS
+#ifdef SUPPORT_YUNOS
+.extern g_active_task
+#define g_current_task g_active_task
+#else
+.extern pxCurrentTCB
+#define g_current_task pxCurrentTCB
+#endif
 
 /* Enable stack backtrace across exception/interrupt - see below */
-#define XT_DEBUG_BACKTRACE    1
+#define XT_DEBUG_BACKTRACE    0
 
 
 /*
@@ -106,6 +120,27 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define XIE_ARG         4
 #define XIE_SIZE        8
 
+
+/*
+  Macro get_percpu_entry_for - convert a per-core ID into a multicore entry.
+  Basically does reg=reg*portNUM_PROCESSORS+current_core_id
+  Multiple versions here to optimize for specific portNUM_PROCESSORS values.
+*/
+    .macro get_percpu_entry_for reg scratch
+#if (portNUM_PROCESSORS == 1)
+    /* No need to do anything */
+#elif  (portNUM_PROCESSORS == 2)
+    /* Optimized 2-core code. */
+    getcoreid \scratch
+    addx2 \reg,\reg,\scratch
+#else
+    /* Generalized n-core code. Untested! */
+    movi \scratch,portNUM_PROCESSORS
+    mull \scratch,\reg,\scratch
+    getcoreid \reg
+    add \reg,\scratch,\reg
+#endif
+   .endm
 /*
 --------------------------------------------------------------------------------
   Macro extract_msb - return the input with only the highest bit set.
@@ -222,6 +257,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     find_ms_setbit a3, a4, a3, 0            /* a3 = interrupt number */
 
+    get_percpu_entry_for a3, a12
+    movi    a4, espos_isr_enter
+    callx4  a4
     movi    a4, _xt_interrupt_table
     addx8   a3, a3, a4                      /* a3 = address of interrupt table entry */
     l32i    a4, a3, XIE_HANDLER             /* a4 = handler address */
@@ -234,6 +272,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     mov     a2, a6                          /* save in windowed reg */
     l32i    a6, a3, XIE_ARG                 /* a6 = handler arg */
     callx4  a4                              /* call handler */
+    movi    a4, espos_isr_exit
+    callx4  a4
     #endif
 
     #ifdef XT_USE_SWPRI
@@ -295,29 +335,89 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --------------------------------------------------------------------------------
 */
 
-    .text
+    .section .iram1,"ax"
+    .global panicHandler
+
     .global     _xt_panic
     .type       _xt_panic,@function
     .align      4
+    .literal_position
+    .align      4
 
 _xt_panic:
-    #ifdef XT_SIMULATOR
-    addi    a4, a0, -3                      /* point to call0 */
-    movi    a3, _xt_panic_message
-    movi    a2, SYS_log_msg
-    simcall
-    movi    a2, SYS_gdb_abort
-    simcall
-    #else
-    rsil    a2, XCHAL_EXCM_LEVEL            /* disable all low & med ints */
-1:  j       1b                              /* loop infinitely */
+    /* Allocate exception frame and save minimal context. */
+    mov     a0, sp
+    addi    sp, sp, -XT_STK_FRMSZ
+    s32i    a0, sp, XT_STK_A1
+    #if XCHAL_HAVE_WINDOWED
+    s32e    a0, sp, -12                     /* for debug backtrace */
     #endif
+    rsr     a0, PS                          /* save interruptee's PS */
+    s32i    a0, sp, XT_STK_PS
+    rsr     a0, EPC_1                       /* save interruptee's PC */
+    s32i    a0, sp, XT_STK_PC
+    #if XCHAL_HAVE_WINDOWED
+    s32e    a0, sp, -16                     /* for debug backtrace */
+    #endif
+    s32i    a12, sp, XT_STK_A12             /* _xt_context_save requires A12- */
+    s32i    a13, sp, XT_STK_A13             /* A13 to have already been saved */
+    call0   _xt_context_save
+
+    /* Save exc cause and vaddr into exception frame */
+    rsr     a0, EXCCAUSE
+    s32i    a0, sp, XT_STK_EXCCAUSE
+    rsr     a0, EXCVADDR
+    s32i    a0, sp, XT_STK_EXCVADDR
+
+    /* _xt_context_save seems to save the current a0, but we need the interuptees a0. Fix this. */
+    rsr     a0, EXCSAVE_1                   /* save interruptee's a0 */
+    s32i    a0, sp, XT_STK_A0
+
+    /* Set up PS for C, disable all interrupts, and clear EXCM. */
+    movi    a0, PS_INTLEVEL(7) | PS_UM | PS_WOE
+    wsr     a0, PS
+
+    //Call panic handler
+    mov     a6,sp
+    call4 panicHandler
+
+1:  j       1b                              /* loop infinitely */
+
+    retw
+
+
+    .align 4
+//Call using call0. Prints the hex char in a2. Kills a3, a4, a5
+panic_print_hex:
+    movi a3,0x60000000
+    movi a4,8
+panic_print_hex_loop:
+    l32i a5, a3, 0x1c
+    extui a5, a5, 16, 8
+    bgei a5,64,panic_print_hex_loop
+
+    srli a5,a2,28
+    bgei a5,10,panic_print_hex_a
+    addi a5,a5,'0'
+    j panic_print_hex_ok
+panic_print_hex_a:
+    addi a5,a5,'A'-10
+panic_print_hex_ok:
+    s32i a5,a3,0
+    slli a2,a2,4
+    
+    addi a4,a4,-1
+    bnei a4,0,panic_print_hex_loop
+    movi a5,' '
+    s32i a5,a3,0
+
+    ret
+
+
 
     .section    .rodata, "a"
     .align      4
 
-_xt_panic_message:
-    .string "\n*** _xt_panic() was called from 0x%08x or jumped to. ***\n"
 
 
 /*
@@ -328,6 +428,9 @@ _xt_panic_message:
     with index 0 containing the entry for user exceptions.
     Initialized with all 0s, meaning no handler is installed at each level.
     See comment in xtensa_rtos.h for more details.
+
+    *WARNING*  This array is for all CPUs, that is, installing a hook for 
+    one CPU will install it for all others as well!
 --------------------------------------------------------------------------------
 */
 
@@ -396,6 +499,8 @@ _DebugExceptionVector:
     jx      a3
     #else
     wsr     a0, EXCSAVE+XCHAL_DEBUGLEVEL    /* save original a0 somewhere */
+    movi    a0,PANIC_RSN_DEBUGEXCEPTION
+    wsr     a0,EXCCAUSE
     call0   _xt_panic                       /* does not return */
     rfi     XCHAL_DEBUGLEVEL                /* make a0 point here not later */
     #endif
@@ -423,6 +528,8 @@ _DoubleExceptionVector:
     #if XCHAL_HAVE_DEBUG
     break   1, 4                            /* unhandled double exception */
     #endif
+    movi    a0,PANIC_RSN_DOUBLEEXCEPTION
+    wsr     a0,EXCCAUSE
     call0   _xt_panic                       /* does not return */
     rfde                                    /* make a0 point here not later */
 
@@ -449,13 +556,15 @@ _KernelExceptionVector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .align      4
 
 _xt_kernel_exc:
     #if XCHAL_HAVE_DEBUG
     break   1, 0                            /* unhandled kernel exception */
     #endif
+    movi    a0,PANIC_RSN_KERNELEXCEPTION
+    wsr     a0,EXCCAUSE
     call0   _xt_panic                       /* does not return */
     rfe                                     /* make a0 point here not there */
 
@@ -489,7 +598,7 @@ _UserExceptionVector:
 --------------------------------------------------------------------------------
 */
 
-    .text
+    .section .iram1,"ax"
 
     #if XCHAL_HAVE_WINDOWED
     .align      4
@@ -553,8 +662,6 @@ _xt_user_exc:
     s32i    a0, sp, XT_STK_PS
     rsr     a0, EPC_1                       /* save interruptee's PC */
     s32i    a0, sp, XT_STK_PC
-    rsr     a0, EXCSAVE_1                   /* save interruptee's a0 */
-    s32i    a0, sp, XT_STK_A0
     #if XCHAL_HAVE_WINDOWED
     s32e    a0, sp, -16                     /* for debug backtrace */
     #endif
@@ -567,6 +674,10 @@ _xt_user_exc:
     s32i    a0, sp, XT_STK_EXCCAUSE
     rsr     a0, EXCVADDR
     s32i    a0, sp, XT_STK_EXCVADDR
+
+    /* _xt_context_save seems to save the current a0, but we need the interuptees a0. Fix this. */
+    rsr     a0, EXCSAVE_1                   /* save interruptee's a0 */
+    s32i    a0, sp, XT_STK_A0
 
     /* Set up PS for C, reenable hi-pri interrupts, and clear EXCM. */
     #ifdef __XTENSA_CALL0_ABI__
@@ -613,6 +724,7 @@ _xt_user_exc:
 
     rsr     a2, EXCCAUSE                    /* recover exc cause */
     movi    a3, _xt_exception_table
+    get_percpu_entry_for a3, a4
     addx4   a4, a2, a3                      /* a4 = address of exception table entry */
     l32i    a4, a4, 0                       /* a4 = handler address */
     #ifdef __XTENSA_CALL0_ABI__
@@ -659,6 +771,7 @@ _xt_user_exit:
 
 
 /*
+
 --------------------------------------------------------------------------------
 Syscall Exception Handler (jumped to from User Exception Handler).
 Syscall 0 is required to spill the register windows (no-op in Call 0 ABI).
@@ -666,7 +779,7 @@ Only syscall 0 is handled here. Other syscalls return -1 to caller in a2.
 --------------------------------------------------------------------------------
 */
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_syscall_exc,@function
     .align      4
 _xt_syscall_exc:
@@ -765,9 +878,9 @@ _xt_coproc_mask:
     .type   _xt_coproc_owner_sa,@object
     .align  16,,XCHAL_CP_MAX<<2     /* minimize crossing cache boundaries */
 _xt_coproc_owner_sa:
-    .space  XCHAL_CP_MAX << 2
+    .space  (XCHAL_CP_MAX * portNUM_PROCESSORS) << 2
 
-    .text
+    .section .iram1,"ax"
 
 
     .align  4
@@ -828,7 +941,24 @@ _xt_coproc_exc:
     rsr     a4, CPENABLE                    /* a4 = CPENABLE */
     addx4   a0, a5, a0                      /* a0 = &_xt_coproc_mask[n] */
     l32i    a0, a0, 0                       /* a0 = (n << 16) | (1 << n) */
-    movi    a3, _xt_coproc_owner_sa     /* (placed here for load slot) */
+
+    /* TODO: Remove this as soon as coprocessor state moving works across cores - JD */
+    /* FPU operations are incompatible with non-pinned tasks. If we have a FPU operation
+       here, to keep the entire thing from crashing, it's better to pin the task to whatever
+       core we're running on now. */
+    movi    a2, g_current_task
+    getcoreid a3
+    addx4     a2,  a3, a2
+    l32i    a2, a2, 0                       /* a2 = start of g_current_task[cpuid] */
+    addi    a2, a2, TASKTCB_XCOREID_OFFSET  /* offset to xCoreID in tcb struct */
+    s32i    a3, a2, 0                       /* store current cpuid */
+
+    /* Grab correct xt_coproc_owner_sa for this core */
+    movi    a2, XCHAL_CP_MAX << 2
+    mull    a2, a2, a3
+    movi    a3, _xt_coproc_owner_sa         /* a3 = base of owner array */
+    add     a3, a3, a2
+
     extui   a2, a0, 0, 16                   /* coprocessor bitmask portion */
     or      a4, a4, a2                      /* a4 = CPENABLE | (1 << n) */
     wsr     a4, CPENABLE
@@ -938,6 +1068,8 @@ _xt_coproc_exc:
     #if XCHAL_HAVE_DEBUG
     break   1, 1                            /* unhandled user exception */
     #endif
+    movi    a0,PANIC_RSN_COPROCEXCEPTION
+    wsr     a0,EXCCAUSE
     call0   _xt_panic                       /* not in a thread (invalid) */
     /* never returns */
 
@@ -951,7 +1083,7 @@ _xt_coproc_exc:
 -------------------------------------------------------------------------------
 */
 
-    .text   
+    .section .iram1,"ax"
     .type       _xt_lowint1,@function
     .align      4
 
@@ -1032,7 +1164,7 @@ _Level2Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_medint2,@function
     .align      4
 _xt_medint2:
@@ -1103,7 +1235,7 @@ _Level3Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_medint3,@function
     .align      4
 _xt_medint3:
@@ -1173,7 +1305,7 @@ _Level4Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_medint4,@function
     .align      4
 _xt_medint4:
@@ -1243,7 +1375,7 @@ _Level5Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_medint5,@function
     .align      4
 _xt_medint5:
@@ -1313,7 +1445,7 @@ _Level6Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_medint6,@function
     .align      4
 _xt_medint6:
@@ -1422,7 +1554,7 @@ _Level2Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_highint2,@function
     .align      4
 _xt_highint2:
@@ -1462,7 +1594,7 @@ _Level3Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_highint3,@function
     .align      4
 _xt_highint3:
@@ -1502,7 +1634,7 @@ _Level4Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_highint4,@function
     .align      4
 _xt_highint4:
@@ -1520,6 +1652,28 @@ _xt_highint4:
     /* USER_EDIT:
     ADD HIGH PRIORITY LEVEL 4 INTERRUPT HANDLER CODE HERE.
     */
+
+
+
+    /* On the ESP32, this level is used for the INT_WDT handler. If that triggers, the program is stuck with interrupts
+       off and the CPU should panic. */
+    rsr     a0, EXCSAVE_4
+    wsr     a0, EXCSAVE_1 /* panic handler reads this register */
+    /* Set EXCCAUSE to reflect cause of the wdt int trigger */
+    movi    a0,PANIC_RSN_INTWDT_CPU0
+    wsr     a0,EXCCAUSE
+#if CONFIG_INT_WDT_CHECK_CPU1
+    /* Check if the cause is the app cpu failing to tick.*/
+    movi    a0, int_wdt_app_cpu_ticked
+    l32i    a0, a0, 0
+    bnez    a0, 1f
+    /* It is. Modify cause. */
+    movi    a0,PANIC_RSN_INTWDT_CPU1
+    wsr     a0,EXCCAUSE
+1:
+#endif
+    call0 _xt_panic
+
 
     .align  4
 .L_xt_highint4_exit:
@@ -1542,7 +1696,7 @@ _Level5Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_highint5,@function
     .align      4
 _xt_highint5:
@@ -1582,7 +1736,7 @@ _Level6Vector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_highint6,@function
     .align      4
 _xt_highint6:
@@ -1622,7 +1776,7 @@ _NMIExceptionVector:
 
     .end        literal_prefix
 
-    .text
+    .section .iram1,"ax"
     .type       _xt_nmi,@function
     .align      4
 _xt_nmi:
@@ -1900,4 +2054,12 @@ _WindowUnderflow12:
     rfwu
 
 #endif /* XCHAL_HAVE_WINDOWED */
+
+    .section    .UserEnter.text, "ax"
+    .global     call_user_start
+    .type       call_user_start,@function
+    .align      4
+    .literal_position
+
+
 

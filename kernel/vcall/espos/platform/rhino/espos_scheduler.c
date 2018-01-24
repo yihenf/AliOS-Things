@@ -21,9 +21,8 @@
 
 static espos_size_t s_isr_nested_count[ESPOS_PROCESSORS_NUM];
 static espos_size_t s_os_nested_count[ESPOS_PROCESSORS_NUM];
-#if 1
+#if 0
 static espos_size_t s_critial_count[ESPOS_PROCESSORS_NUM];
-static espos_critical_t s_critial_status[ESPOS_PROCESSORS_NUM];
 #endif
 
 /**
@@ -94,10 +93,6 @@ espos_critical_t _espos_enter_critical(espos_spinlock_t *spinlock)
     espos_critical_t tmp;
 
     tmp = (espos_critical_t)XTOS_SET_INTLEVEL(XCHAL_EXCM_LEVEL);
-    if (!s_critial_count[espos_get_core_id()]) {
-        s_critial_status[espos_get_core_id()] = tmp;
-    }
-    s_critial_count[espos_get_core_id()]++;
 
     return tmp;
 }
@@ -107,11 +102,7 @@ espos_critical_t _espos_enter_critical(espos_spinlock_t *spinlock)
  */
 void _espos_exit_critical(espos_spinlock_t *spinlock, espos_critical_t tmp)
 {
-    s_critial_count[espos_get_core_id()]--;
-    if (!s_critial_count[espos_get_core_id()]) {
-        tmp = s_critial_status[espos_get_core_id()];
-        XTOS_RESTORE_JUST_INTLEVEL(tmp);
-    }
+    XTOS_RESTORE_JUST_INTLEVEL(tmp);
 }
 
 
@@ -172,7 +163,7 @@ void espos_isr_exit(void)
  */
 esp_err_t espos_os_enter (void)
 {
-    s_os_nested_count[espos_get_core_id()]++;
+    s_os_nested_count[0]++;
 
     return 0;
 }
@@ -182,11 +173,11 @@ esp_err_t espos_os_enter (void)
  */
 void espos_os_exit(void)
 {
-    if (!s_os_nested_count[espos_get_core_id()]) {
+    if (!s_os_nested_count[0]) {
         return ;
     }
 
-    s_os_nested_count[espos_get_core_id()]--;
+    s_os_nested_count[0]--;
 
     return ;
 }

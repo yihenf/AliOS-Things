@@ -34,15 +34,11 @@ ifeq ($(vcall),rhino)
 GLOBAL_DEFINES += VCALL_RHINO
 $(NAME)_COMPONENTS += rhino
 
-ifeq ($(HOST_MCU_FAMILY),esp32)
-$(NAME)_COMPONENTS += vcall.espos
-else
-ifeq ($(HOST_MCU_FAMILY),esp8266)
-$(NAME)_COMPONENTS += vcall.espos
-else
+ifneq ($(HOST_MCU_FAMILY),esp32)
 $(NAME)_SOURCES := \
     mico/mico_rhino.c
-endif
+else
+$(NAME)_COMPONENTS += vcall.espos
 endif
 
 $(NAME)_SOURCES += \
