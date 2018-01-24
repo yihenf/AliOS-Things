@@ -16,7 +16,6 @@
 
 #define COAP_DEFAULT_SCHEME      "coap" /* the default scheme for CoAP URIs */
 #define COAP_DEFAULT_HOST_LEN    128
-#define NULL_STR                 "NULL"
 
 unsigned int CoAPUri_parse(char *p_uri, coap_address_t *p_addr,
                            coap_endpoint_type *p_endpoint_type, char host[COAP_DEFAULT_HOST_LEN])
@@ -77,12 +76,12 @@ unsigned int CoAPUri_parse(char *p_uri, coap_address_t *p_addr,
         memset(host, 0x00, COAP_DEFAULT_HOST_LEN);
         strncpy(host , p, q - p);
     }
-    COAP_DEBUG("The host name is: %s\r\n", host?host:NULL_STR);
+    COAP_DEBUG("The host name is: %s\r\n", host);
     ret = HAL_UDP_resolveAddress(host, p_addr->addr);
     if (0 != ret) {
         return COAP_ERROR_DNS_FAILED;
     }
-    COAP_DEBUG("The address is: %s\r\n", p_addr->addr?p_addr->addr:NULL_STR);
+    COAP_DEBUG("The address is: %s\r\n", p_addr->addr);
 
     if (len && *q == ':') {
         p = ++q;
@@ -199,11 +198,8 @@ CoAPContext *CoAPContext_create(CoAPInitParam *param)
             p_ctx    =  NULL;
         }
     }
-    else{
-        aos_poll_read_fd(p_ctx->network.socket_id, cb_recv, p_ctx);
-    }
    
-    
+    aos_poll_read_fd(p_ctx->network.socket_id, cb_recv, p_ctx);
     return p_ctx;
 }
 
@@ -214,7 +210,7 @@ void CoAPContext_free(CoAPContext *p_ctx)
 
     aos_cancel_poll_read_fd(p_ctx->network.socket_id,cb_recv,p_ctx);
     CoAPNetwork_deinit(&p_ctx->network);
-    
+
     list_for_each_entry_safe(cur, next, &p_ctx->list.sendlist, CoAPSendNode, sendlist) {
         if (NULL != cur) {
             if (NULL != cur->message) {
@@ -224,7 +220,7 @@ void CoAPContext_free(CoAPContext *p_ctx)
             coap_free(cur);
             cur = NULL;
         }
-    }  
+    }
 
     if (NULL != p_ctx->recvbuf) {
         coap_free(p_ctx->recvbuf);
